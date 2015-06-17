@@ -76,10 +76,8 @@ void setup()
         Serial.print(" START ID : ");
         Serial.print(BOARD_ID);
     #endif
-
-    startWatchdog();
-
     setup_slave_master( );
+    startWatchdog();
    // setup_analog_timer();
 
     // Read and init ADCC for 1st time (dummy value)

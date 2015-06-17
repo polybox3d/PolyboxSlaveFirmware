@@ -21,29 +21,29 @@
 
 /***********************************************************************
  * EPS : Extension Pin System
- * 
- * Provide more pin for a arduino master. You can use as much Arduino 
+ *
+ * Provide more pin for a arduino master. You can use as much Arduino
  * slave you like.
- * 
- * Slave doesnt know his pin-mapping, and all the configuration is 
+ *
+ * Slave doesnt know his pin-mapping, and all the configuration is
  * provided by the Master. A time_out system detect when a slave/master
  *  is deconnected.
- * 
+ *
  *  A Pin can be OUT or INPUT.
- * 
+ *
  *  INPUT pin are monitored and sent to master periodicaly when values
- * changed. Futhermore, user can specify FAST or STANDARD (default) 
+ * changed. Futhermore, user can specify FAST or STANDARD (default)
  * monitoring. COUNTER pin is inherited from PIN, and provide a counter.
  * Check doc/code for futher information.
- * 
+ *
  * Handshake :
- * 
+ *
  * Wait > Check Version > Init > Running
- * 
+ *
  * ********************************************************************/
 
 #if defined(ARDUINO) && ARDUINO >= 100
-#define I2C_WRITE write 
+#define I2C_WRITE write
 #define I2C_READ read
 #include "Arduino.h"
 #else
@@ -59,11 +59,12 @@
 #include "Board.h"
 #include <Wire.h>
 
+#include "Configuration.h"
 
 /***********************************************************************
- * 
+ *
  * Defines
- * 
+ *
  * ********************************************************************/
 
 #define EPS_PROTOCOL_VERSION 1
@@ -78,8 +79,8 @@
 #define EPS_RESET           7
 #define EPS_VERSION         8
 #define EPS_INIT            9
-#define EPS_TOKEN			10
-#define EPS_ACK				31
+#define EPS_TOKEN           10
+#define EPS_ACK             31
 
 #define MASTER_ID           1
 
@@ -89,9 +90,9 @@
 #define VPIN_MODE( p, v) eps_write_vpin_type( p, v)
 
 /***********************************************************************
- * 
+ *
  * Extern Variables
- * 
+ *
  * ********************************************************************/
 
 class Board;
@@ -101,11 +102,12 @@ extern bool send_entries_flag;
 extern volatile bool has_token;
 extern uint32_t i2c_ack_resend_count;
 extern uint32_t i2c_timer;
+extern uint8_t need_restart_handshake;
 
 /***********************************************************************
- * 
+ *
  * Read/Write Functions
- * 
+ *
  * ********************************************************************/
 
 uint8_t vpin2bpin(int vpin);
@@ -123,9 +125,9 @@ void eps_write_vpin_type( int pin, uint8_t type);
 
 
 /***********************************************************************
- * 
+ *
  * Functions
- * 
+ *
  * ********************************************************************/
 
 void eps_send_board_update(uint8_t dest);
@@ -141,7 +143,7 @@ void printAllPin();
 
 #ifdef IS_MASTER // glitch
  void operator delete(void * p);
- void * operator new(size_t size); 
+ void * operator new(size_t size);
 #endif
 
 

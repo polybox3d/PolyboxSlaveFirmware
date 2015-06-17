@@ -32,18 +32,19 @@ uint8_t i2c_buffer[BUFFER_LENGTH];
 uint32_t i2c_ack_resend_count = 0;
 uint32_t i2c_timer = 0;
 uint8_t i2c_ack_reply_destination = 1;
+uint8_t need_restart_handshake = false;
 
-void(* reset_board) (void) = 0; 
+void(* reset_board) (void) = 0;
 
 void setup_slave_master(  ) {
     Wire.begin( BOARD_ID );          // join i2c bus
-    Wire.onReceive(i2cReceiveEvent); // register event  
-    Wire.onRequest(i2cRequestEvent); // register event  
+    Wire.onReceive(i2cReceiveEvent); // register event
+    Wire.onRequest(i2cRequestEvent); // register event
 }
 
 void eps_manage()
-{	
-	i2c_timer++;
+{
+    i2c_timer++;
 }
 uint8_t vpin2bpin(int vpin)
 {
@@ -55,18 +56,18 @@ uint8_t vpin2bpin(int vpin)
 }
 void printAllPin()
 {
-	for ( uint8_t i =0 ; i<NUM_BOARD ; ++i )
-	{
-		Serial.print("Board");
-		Serial.println(i);
-		for ( uint8_t h = 0 ; h<PINS_PER_BOARD ; ++h )
-		{
-			Serial.print(h);
-			Serial.print(":");
-			Serial.print( boards[i].pin_values[h]->value);
-			Serial.print("  ");
-		}
-	}
+    for ( uint8_t i =0 ; i<NUM_BOARD ; ++i )
+    {
+        Serial.print("Board");
+        Serial.println(i);
+        for ( uint8_t h = 0 ; h<PINS_PER_BOARD ; ++h )
+        {
+            Serial.print(h);
+            Serial.print(":");
+            Serial.print( boards[i].pin_values[h]->value);
+            Serial.print("  ");
+        }
+    }
 }
 // READ
 int eps_read_vpin_value( int pin )
@@ -124,16 +125,16 @@ void eps_write_vpin_type( int pin, uint8_t type) {
     boards[vpin2board(pin)].pin_values[real_pin]->type = type ;
 }
 
-void eps_send_board_update(uint8_t dest) 
+void eps_send_board_update(uint8_t dest)
 {
-    if ( ! boards[dest].pin_update_queue.isEmpty() ) 
+    if ( ! boards[dest].pin_update_queue.isEmpty() )
     {
         Update up;
         byte count=0;
         int value=0;
         count = 0;
         uint8_t buffer[32];
-        while ( !boards[dest].pin_update_queue.isEmpty() && count < BUFFER_LENGTH-2) 
+        while ( !boards[dest].pin_update_queue.isEmpty() && count < BUFFER_LENGTH-2)
         {
             up = boards[dest].pin_update_queue.pop();
             buffer[count++] = up.type;
@@ -158,14 +159,14 @@ byte eps_send_entries()
     uint8_t j;
     for( j =0; j< ((BUFFER_LENGTH)/3) ; ++j ) // Loop to send all entries. TWI buffer is only 32 Byte. We send 3 byte during each "for" loop
     {
-        if ( ( boards[0].read_bpin_type(next_send_pin)  & PIN_TYPE_IO_MASK ) == PIN_TYPE_INPUT ) 
+        if ( ( boards[0].read_bpin_type(next_send_pin)  & PIN_TYPE_IO_MASK ) == PIN_TYPE_INPUT )
         {
-			Wire.I2C_WRITE( EPS_SET );
+            Wire.I2C_WRITE( EPS_SET );
             Wire.I2C_WRITE( next_send_pin );
             Wire.I2C_WRITE( (byte) ((boards[0].pin_values[next_send_pin]->value & 0xFF00) >> 8)  );
             Wire.I2C_WRITE( (byte) (boards[0].pin_values[next_send_pin]->value & 0x00FF) );
         }
-        next_send_pin = (next_send_pin+1) % PINS_PER_BOARD;      
+        next_send_pin = (next_send_pin+1) % PINS_PER_BOARD;
         if ( next_send_pin == 0 )
         {
             return false;
@@ -176,50 +177,72 @@ byte eps_send_entries()
 
 void i2cRequestEvent()
 {
-	uint8_t action = board.check_state;	
-    if ( action == BOARD_WAIT_PONG && board.connected ) 
+    uint8_t action = board.check_state;
+    if ( need_restart_handshake )
     {
-		Wire.I2C_WRITE( EPS_PONG );
-		board.check_state = BOARD_OK;
-		Serial.print(".");
+        need_restart_handshake = false;
+        Wire.I2C_WRITE( EPS_RESET );
+        #if OUTPUT_SERIAL
+            Serial.print(" RESHAKE MASTER SIDE ");
+        #endif
     }
-    else if ( send_entries_flag && board.connected ) 
+    else if ( action == BOARD_WAIT_PONG && board.connected )
     {
-		eps_send_entries();
-		send_entries_flag = false;
-		Serial.print("+");
-	}
-    else if ( action == EPS_RESET ) 
+        Wire.I2C_WRITE( EPS_PONG );
+        board.check_state = BOARD_OK;
+        #if OUTPUT_SERIAL
+            Serial.print(".");
+        #endif
+    }
+    else if ( send_entries_flag && board.connected )
     {
-		Serial.print(" RESET BOARD Q ");
+        eps_send_entries();
+        send_entries_flag = false;
+        #if OUTPUT_SERIAL
+            Serial.print("+");
+        #endif
+    }
+    else if ( action == EPS_RESET )
+    {
+        #if OUTPUT_SERIAL
+            Serial.print(" RESET BOARD Q ");
+        #endif
         //reset_board();
     }
-    else if ( action == BOARD_WAIT_INIT ) 
+    else if ( action == BOARD_WAIT_INIT )
     {
-		Wire.I2C_WRITE( EPS_INIT );
-		board.check_state = BOARD_OK;
-		board.connected = true;
-		Serial.print(" INITQ ");
+        Wire.I2C_WRITE( EPS_INIT );
+        board.check_state = BOARD_OK;
+        board.connected = true;
+        #if OUTPUT_SERIAL
+            Serial.print(" INITQ ");
+        #endif
     }
-    else if ( has_token ) 
+    else if ( has_token )
     {
-		eps_send_board_update(0);
-		has_token = false;
-		Serial.print("*");
+        eps_send_board_update(0);
+        has_token = false;
+        #if OUTPUT_SERIAL
+            Serial.print("*");
+        #endif
     }
-    else if ( action == BOARD_WAIT_VERSION ) 
-    { 
-		Wire.I2C_WRITE( EPS_PROTOCOL_VERSION ); 
-		board.check_state = BOARD_W8_MASTER;
-        Serial.print(" VERSQ ");
+    else if ( action == BOARD_WAIT_VERSION )
+    {
+        Wire.I2C_WRITE( EPS_PROTOCOL_VERSION );
+        board.check_state = BOARD_W8_MASTER;
+        #if OUTPUT_SERIAL
+            Serial.print(" VERSQ ");
+        #endif
     }
     else
     {
-        Serial.print(" elseREQ? ");
-        Serial.print( action );        
+        #if OUTPUT_SERIAL
+            Serial.print(" elseREQ? ");
+            Serial.print( action );
+        #endif
     }
 
-	
+
 }
 
 // function that executes whenever data is received from master
@@ -230,42 +253,48 @@ void i2cReceiveEvent(int howMany)
     int value = 0;
     int sender = Wire.I2C_READ() -1;
     byte action = Wire.read();
-    
+
     ///< ACK system
-	i2c_ack_reply_destination = sender + 1 ;
-	send_ack = true;
-	
-    if ( action == EPS_GET && board.connected ) 
+    i2c_ack_reply_destination = sender + 1 ;
+    send_ack = true;
+
+    if ( action == EPS_GET && board.connected )
     {
         send_entries_flag = true;
     }
-	else if ( action == EPS_TOKEN && board.connected)
-	{
-		has_token = true;
-	}
-    else if ( action == EPS_SET  && board.connected) 
+    else if ( action == EPS_TOKEN && board.connected)
+    {
+        has_token = true;
+    }
+    else if ( action == EPS_TOKEN && ! board.connected)
+    {
+        need_restart_handshake = true;
+    }
+    else if ( action == EPS_SET  && board.connected)
     {
         if ( Wire.available() )
         {
             pin = Wire.I2C_READ();
             value = Wire.I2C_READ()<<8;
             value += Wire.I2C_READ();
-            WRITE_VPIN( pin, value );            
+            WRITE_VPIN( pin, value );
         }
     }
-    else if ( action == EPS_SETUP && board.connected ) 
+    else if ( action == EPS_SETUP && board.connected )
     {
         while ( Wire.available() )
         {
             pin = Wire.I2C_READ();
             value = Wire.I2C_READ();
-            VPIN_MODE( pin, value );  
+            VPIN_MODE( pin, value );
             Serial.print(pin);
         }
     }
-    else if ( action == EPS_ALL && board.connected) 
+    else if ( action == EPS_ALL && board.connected)
     {
-		Serial.print(" ***ALL/UP*** ");
+        #if OUTPUT_SERIAL
+            Serial.print(" ***ALL/UP*** ");
+        #endif
         while ( Wire.available() )
         {
             action = Wire.I2C_READ();
@@ -275,35 +304,36 @@ void i2cReceiveEvent(int howMany)
                 value = Wire.I2C_READ() << 8;
                 value += Wire.I2C_READ();
                 WRITE_VPIN( pin, value );
-                
+
             }
             else if ( action == EPS_SETUP)
             {
                 value = Wire.I2C_READ();
-                VPIN_MODE( pin, value );    
+                VPIN_MODE( pin, value );
             }
         }
-        
+
     }
-    else if ( action == EPS_RESET ) 
+    else if ( action == EPS_RESET )
     {
-		Serial.print(" RESET BOARD ");
+        #if OUTPUT_SERIAL
+            Serial.print(" RESET BOARD ");
+        #endif
         //reset_board();
     }
-    else if ( action == EPS_INIT ) 
+    else if ( action == EPS_INIT )
     {
         board.check_state = BOARD_WAIT_INIT;
     }
-    else if ( action == EPS_VERSION ) 
+    else if ( action == EPS_VERSION )
     {
-		restart_counter++;
+        restart_counter++;
         board.connected = false;
         if ( Wire.available() )
         {
             value = Wire.read();
             if ( value > EPS_PROTOCOL_VERSION )
             {
-				Serial.print(" VERSBAD ");
                 board.check_state = BOARD_BAD_VERSION;
             }
             else
@@ -312,14 +342,16 @@ void i2cReceiveEvent(int howMany)
             }
         }
     }
-	else if ( action == EPS_PING && board.connected )
-	{
-		board.check_state = BOARD_WAIT_PONG;
-	}
+    else if ( action == EPS_PING && board.connected )
+    {
+        board.check_state = BOARD_WAIT_PONG;
+    }
     else
     {
-        Serial.print(" else? ");
-        Serial.print( action );        
+        #if OUTPUT_SERIAL
+            Serial.print(" else? ");
+            Serial.print( action );
+        #endif
     }
 }
 
