@@ -104,6 +104,7 @@ void loop() {
     }
     else if ( board.check_state == BOARD_W8_MASTER )
     {
+            analogWrite(13,200);
         #if OUTPUT_SERIAL
             Serial.print(" W8 ");
         #endif

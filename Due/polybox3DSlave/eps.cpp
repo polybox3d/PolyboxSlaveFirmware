@@ -90,10 +90,11 @@ int board_read_bpin_value( uint8_t b, uint8_t pin )
 
 // WRITE
 
-void eps_set_vpin_value( int pin, int value) {
+void eps_set_vpin_value( int pin, uint16_t value) {
     uint8_t real_pin = vpin2bpin(pin);
     uint8_t board_n = vpin2board(pin);
     boards[board_n].write_bpin( real_pin, value );
+    Serial.print(value);
     if ( pin >= PINS_PER_BOARD ) // start virtual pin (i.e other Arduino board)
     {
         boards[board_n].pin_update_queue.push( Update{real_pin, EPS_SET} );
@@ -106,7 +107,7 @@ void eps_set_vpin_value( int pin, int value) {
         }
         else
         {*/
-        analogWrite( real_pin, value );
+        analogWrite(real_pin, (uint16_t)value);
         //}
     }//pin_update_queue.push( Update{pin, eps_SET} );
 }
@@ -131,7 +132,7 @@ void eps_send_board_update(uint8_t dest)
     {
         Update up;
         byte count=0;
-        int value=0;
+        uint16_t value=0;
         count = 0;
         uint8_t buffer[32];
         while ( !boards[dest].pin_update_queue.isEmpty() && count < BUFFER_LENGTH-2)
@@ -299,6 +300,7 @@ void i2cReceiveEvent(int howMany)
         {
             action = Wire.I2C_READ();
             pin = Wire.I2C_READ();
+
             if ( action == EPS_SET)
             {
                 value = Wire.I2C_READ() << 8;

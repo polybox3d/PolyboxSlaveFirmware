@@ -36,7 +36,7 @@
 #define WATCHDOG_INTERVAL       1024u  // 8sec  (~16 seconds max)
 
 /** Output information and state on Serial (rx/tx). **/
-#define OUTPUT_SERIAL 1
+#define OUTPUT_SERIAL 0
 
 
 #endif //CONFIGURATION_H

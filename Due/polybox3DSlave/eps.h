@@ -120,7 +120,7 @@ int eps_read_vpin_value( int pin );
 uint8_t eps_read_vpin_type( int pin );
 
 // WRITE
-void eps_set_vpin_value( int pin, int value);
+void eps_set_vpin_value( int pin, uint16_t value);
 void eps_write_vpin_type( int pin, uint8_t type);
 
 
