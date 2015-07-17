@@ -56,8 +56,10 @@ uint8_t vpin2bpin(int vpin)
 }
 void printAllPin()
 {
+    #if OUTPUT_SERIAL
     for ( uint8_t i =0 ; i<NUM_BOARD ; ++i )
     {
+
         Serial.print("Board");
         Serial.println(i);
         for ( uint8_t h = 0 ; h<PINS_PER_BOARD ; ++h )
@@ -68,6 +70,7 @@ void printAllPin()
             Serial.print("  ");
         }
     }
+    #endif
 }
 // READ
 int eps_read_vpin_value( int pin )
@@ -94,7 +97,9 @@ void eps_set_vpin_value( int pin, uint16_t value) {
     uint8_t real_pin = vpin2bpin(pin);
     uint8_t board_n = vpin2board(pin);
     boards[board_n].write_bpin( real_pin, value );
-    Serial.print(value);
+    #if OUTPUT_SERIAL
+        Serial.print(value);
+    #endif
     if ( pin >= PINS_PER_BOARD ) // start virtual pin (i.e other Arduino board)
     {
         boards[board_n].pin_update_queue.push( Update{real_pin, EPS_SET} );
@@ -128,30 +133,31 @@ void eps_write_vpin_type( int pin, uint8_t type) {
 
 void eps_send_board_update(uint8_t dest)
 {
-    if ( ! boards[dest].pin_update_queue.isEmpty() )
+    Update up;
+    byte count=0;
+    uint16_t value=0;
+    count = 0;
+    uint8_t buffer[BUFFER_LENGTH];
+    while ( !boards[dest].pin_update_queue.isEmpty() && count < (BUFFER_LENGTH-5))
     {
-        Update up;
-        byte count=0;
-        uint16_t value=0;
-        count = 0;
-        uint8_t buffer[32];
-        while ( !boards[dest].pin_update_queue.isEmpty() && count < BUFFER_LENGTH-2)
-        {
-            up = boards[dest].pin_update_queue.pop();
-            buffer[count++] = up.type;
-            buffer[count++] = up.pin;
-            if ( up.type == EPS_SET ) {
-                value = boards[dest].read_bpin(up.pin);
-                buffer[count++] = (byte) ( ( value & 0xFF00)>>8 );
-                buffer[count++] = (byte) ( value & 0x00FF );
-            }
-            else if ( up.type == EPS_SETUP )
-            {
-                buffer[count++] = boards[dest].read_bpin_type(up.pin);
-            }
+        up = boards[dest].pin_update_queue.pop();
+        buffer[count++] = up.type;
+        buffer[count++] = up.pin;
+        if ( up.type == EPS_SET ) {
+            value = boards[dest].read_bpin(up.pin);
+            buffer[count++] = (byte) ( ( value & 0xFF00)>>8 );
+            buffer[count++] = (byte) ( value & 0x00FF );
         }
-        Wire.I2C_WRITE( buffer, count );
+        else if ( up.type == EPS_SETUP )
+        {
+            buffer[count++] = boards[dest].read_bpin_type(up.pin);
+        }
     }
+    while ( count < BUFFER_LENGTH )
+    {
+        buffer[count++] = EPS_SET_END;
+    }
+    Wire.I2C_WRITE( buffer, count );
 }
 
 
@@ -288,7 +294,9 @@ void i2cReceiveEvent(int howMany)
             pin = Wire.I2C_READ();
             value = Wire.I2C_READ();
             VPIN_MODE( pin, value );
-            Serial.print(pin);
+            #if OUTPUT_SERIAL
+                Serial.print(pin);
+            #endif
         }
     }
     else if ( action == EPS_ALL && board.connected)

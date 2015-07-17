@@ -24,6 +24,7 @@
 #ifndef __CONFIGURATION_EPS_H__
 #define __CONFIGURATION_EPS_H__
 
+// [1 ,2 ,3 ,4]
 #define SLAVE_ID 4
 
 #ifndef SLAVE_ID

@@ -80,7 +80,9 @@
 #define EPS_VERSION         8
 #define EPS_INIT            9
 #define EPS_TOKEN           10
+#define EPS_SET_END         11
 #define EPS_ACK             31
+
 
 #define MASTER_ID           1
 
