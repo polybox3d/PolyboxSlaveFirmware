@@ -25,7 +25,7 @@
 #define __CONFIGURATION_EPS_H__
 
 // [1 ,2 ,3 ,4]
-#define SLAVE_ID 4
+#define SLAVE_ID 1
 
 #ifndef SLAVE_ID
   #error "You must define a slave number. You can do it though make command or using SLAVE_ID define"

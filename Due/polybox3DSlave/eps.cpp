@@ -94,15 +94,11 @@ int board_read_bpin_value( uint8_t b, uint8_t pin )
 // WRITE
 
 void eps_set_vpin_value( int pin, uint16_t value) {
-    uint8_t real_pin = vpin2bpin(pin);
-    uint8_t board_n = vpin2board(pin);
-    boards[board_n].write_bpin( real_pin, value );
-    #if OUTPUT_SERIAL
-        Serial.print(value);
-    #endif
+    board.write_bpin( pin, value );
+
     if ( pin >= PINS_PER_BOARD ) // start virtual pin (i.e other Arduino board)
     {
-        boards[board_n].pin_update_queue.push( Update{real_pin, EPS_SET} );
+        return;
     }
     else
     {
@@ -112,23 +108,30 @@ void eps_set_vpin_value( int pin, uint16_t value) {
         }
         else
         {*/
-        analogWrite(real_pin, (uint16_t)value);
-        //}
-    }//pin_update_queue.push( Update{pin, eps_SET} );
+        #if OUTPUT_SERIAL
+            if ( pin == 0 || pin == 1)
+                return;
+        #endif
+     //   digitalWrite(pin, value);
+        analogWrite(pin, value);
+
+    }
 }
 
 void eps_write_vpin_type( int pin, uint8_t type) {
-    uint8_t real_pin = vpin2bpin(pin);
+
     if ( pin >= PINS_PER_BOARD ) // start virtual pin (i.e other Arduino board)
     // So we need to update the fifo queue.
     {
-        boards[vpin2board(pin)].pin_update_queue.push( Update{real_pin, EPS_SETUP} );
+        return;
     }
     else
     {
-        pinMode(real_pin, type & PIN_TYPE_IO_MASK );
+        //CORRECT_ANALOG_PINMODE_BUG
+// @todo
+        pinMode(pin, (type & PIN_TYPE_IO_MASK) );
     }
-    boards[vpin2board(pin)].pin_values[real_pin]->type = type ;
+    board.pin_values[pin]->type = type ;
 }
 
 void eps_send_board_update(uint8_t dest)
@@ -248,8 +251,6 @@ void i2cRequestEvent()
             Serial.print( action );
         #endif
     }
-
-
 }
 
 // function that executes whenever data is received from master
@@ -284,7 +285,18 @@ void i2cReceiveEvent(int howMany)
             pin = Wire.I2C_READ();
             value = Wire.I2C_READ()<<8;
             value += Wire.I2C_READ();
-            WRITE_VPIN( pin, value );
+            #if OUTPUT_SERIAL
+            if ( pin != 0 && pin != 1)
+            #endif
+            {
+                WRITE_VPIN( pin, value );
+                #if OUTPUT_SERIAL
+                    Serial.print(" SET ");
+                    Serial.print(pin);
+                    Serial.print(":");
+                    Serial.print(value);
+                #endif
+            }
         }
     }
     else if ( action == EPS_SETUP && board.connected )
@@ -293,10 +305,18 @@ void i2cReceiveEvent(int howMany)
         {
             pin = Wire.I2C_READ();
             value = Wire.I2C_READ();
-            VPIN_MODE( pin, value );
             #if OUTPUT_SERIAL
-                Serial.print(pin);
+            if ( pin != 0 && pin != 1)
             #endif
+            {
+                VPIN_MODE( pin, value );
+                #if OUTPUT_SERIAL
+                    Serial.print(" SETUP ");
+                    Serial.print(pin);
+                    Serial.print(":");
+                    Serial.print(value);
+                #endif
+            }
         }
     }
     else if ( action == EPS_ALL && board.connected)
@@ -308,18 +328,40 @@ void i2cReceiveEvent(int howMany)
         {
             action = Wire.I2C_READ();
             pin = Wire.I2C_READ();
+            value=0;
 
             if ( action == EPS_SET)
             {
                 value = Wire.I2C_READ() << 8;
                 value += Wire.I2C_READ();
-                WRITE_VPIN( pin, value );
-
+                #if OUTPUT_SERIAL
+                if ( pin != 0 && pin != 1)
+                #endif
+                {
+                    WRITE_VPIN( pin, value );
+                    #if OUTPUT_SERIAL
+                        Serial.print(" SET_ ");
+                        Serial.print(pin);
+                        Serial.print(":");
+                        Serial.print(value);
+                    #endif
+                }
             }
             else if ( action == EPS_SETUP)
             {
                 value = Wire.I2C_READ();
-                VPIN_MODE( pin, value );
+                #if OUTPUT_SERIAL
+                if ( pin != 0 && pin != 1)
+                #endif
+                {
+                    VPIN_MODE( pin, value );
+                    #if OUTPUT_SERIAL
+                        Serial.print(" SETUP_ ");
+                        Serial.print(pin);
+                        Serial.print(":");
+                        Serial.print(value);
+                    #endif
+                }
             }
         }
 

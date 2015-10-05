@@ -34,9 +34,12 @@
 
 // INTERVAL / (32Khz/128)  = seconds
 #define WATCHDOG_INTERVAL       1024u  // 8sec  (~16 seconds max)
+#define F_CPU_TRUE  84000000        // actual CPU clock frequency
 
 /** Output information and state on Serial (rx/tx). **/
-#define OUTPUT_SERIAL 0
+#define OUTPUT_SERIAL 1
+#define OUTPUT_END_OF_LOOP 0
+#define CORRECT_ANALOG_PINMODE_BUG 1
 
 
 #endif //CONFIGURATION_H
